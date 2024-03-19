@@ -5,7 +5,7 @@ terraform {
 provider "aws" {
   access_key                  = "test"
   secret_key                  = "test"
-  region                      = "us-east-1"
+  region                      = local.region
   skip_credentials_validation = true
   skip_requesting_account_id  = true
   skip_metadata_api_check     = true
@@ -119,7 +119,7 @@ resource "aws_lambda_function" "CreateTaskHandler" {
 
   environment {
     variables = {
-      REGION     = "us-east-1"
+      REGION     = local.region
       TASK_TABLE = aws_dynamodb_table.task_table.name
     }
   }
@@ -151,7 +151,7 @@ resource "aws_lambda_function" "ListTaskHandler" {
 
   environment {
     variables = {
-      REGION     = "us-east-1"
+      REGION     = local.region
       TASK_TABLE = aws_dynamodb_table.task_table.name
     }
   }
@@ -183,8 +183,8 @@ resource "aws_lambda_function" "executeScheduledTaskHandler" {
 
   environment {
     variables = {
-      REGION     = "us-east-1"
-      DST_BUCKET = "taskstorage",
+      REGION     = local.region
+      DST_BUCKET = local.bucket_name,
     }
   }
 
@@ -361,7 +361,7 @@ resource "aws_iam_role_policy_attachment" "terraform_lambda_iam_policy_basic_exe
 }
 
 resource "aws_s3_bucket" "taskstorage" {
-  bucket        = "taskstorage"
+  bucket        = local.bucket_name
   force_destroy = true
 }
 

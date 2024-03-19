@@ -48,5 +48,5 @@ def lambda_handler(event, context):
         logging.error(e)
         return {
             'statusCode': 500,
-           'body': '{"status":"Server error ' + e + '"}'
+           'body': '{"status":"Server error: ' + e + '"}'
         }

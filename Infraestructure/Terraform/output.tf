@@ -4,6 +4,6 @@ output "api_invoke_url" {
 }
 
 output "api_rest_api_id" {
-  description = "API invoke url."
+  description = "API rest api id."
   value       = aws_api_gateway_deployment.taskapistageprod.rest_api_id
 }
