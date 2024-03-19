@@ -7,7 +7,6 @@ import re
  
 session = boto3.Session(region_name=os.environ['REGION'])
 dynamodb_client = session.client('dynamodb')
-id = uuid.uuid1()
 
 cron_regex = '(@(annually|yearly|monthly|weekly|daily|hourly|reboot))|(@every (\d+(ns|us|µs|ms|s|m|h))+)|((((\d+,)+\d+|(\d+(\/|-)\d+)|\d+|\*) ?){5,7})'
 
@@ -36,7 +35,7 @@ def lambda_handler(event, context):
                     "S": payload["cron_expression"]
                 },
                 "task_id": {
-                    "S": str(id)
+                    "S": str(uuid.uuid4())
                 }
             }
         )
