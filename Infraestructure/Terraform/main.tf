@@ -14,20 +14,44 @@ provider "aws" {
   endpoints {
     apigateway     = "http://localhost:4566"
     apigatewayv2   = "http://localhost:4566"
+    cloudformation = "http://localhost:4566"
     cloudwatch     = "http://localhost:4566"
-    cloudwatchlogs = "http://localhost:4566"
-    lambda         = "http://localhost:4566"
     dynamodb       = "http://localhost:4566"
+    ec2            = "http://localhost:4566"
+    es             = "http://localhost:4566"
+    elasticache    = "http://localhost:4566"
     events         = "http://localhost:4566"
+    firehose       = "http://localhost:4566"
     iam            = "http://localhost:4566"
-    sts            = "http://localhost:4566"
+    kinesis        = "http://localhost:4566"
+    kms            = "http://localhost:4566"
+    lambda         = "http://localhost:4566"
+    rds            = "http://localhost:4566"
+    redshift       = "http://localhost:4566"
+    route53        = "http://localhost:4566"
     s3             = "http://s3.localhost.localstack.cloud:4566"
+    secretsmanager = "http://localhost:4566"
+    ses            = "http://localhost:4566"
+    sns            = "http://localhost:4566"
+    sqs            = "http://localhost:4566"
+    ssm            = "http://localhost:4566"
+    stepfunctions  = "http://localhost:4566"
+    sts            = "http://localhost:4566"
   }
 }
 
 # Add here all the infraestructure logic
 
 # DynamoDB
+
+# VPC gateway endpoint for DynamoDB. This will make sure our Lambda can access DynamoDB without going over the internet
+resource "aws_vpc_endpoint" "dynamodb_vpce" {
+  vpc_id            = aws_vpc.vpc.id
+  service_name      = "com.amazonaws.${local.region}.dynamodb"
+  vpc_endpoint_type = "Gateway"
+  route_table_ids   = [aws_route_table.route_table_private.id]
+  policy            = data.aws_iam_policy_document.s3_endpoint_policy.json
+}
 
 resource "aws_dynamodb_table" "task_table" {
 
@@ -62,6 +86,85 @@ resource "aws_dynamodb_table" "task_table" {
 ##############################################
 
 # Lambdas
+
+# VPC
+resource "aws_vpc" "vpc" {
+  cidr_block = "10.0.0.0/16"
+  tags = {
+    Name = "${local.project}-vpc"
+  }
+}
+
+resource "aws_subnet" "subnet_private" {
+  vpc_id                  = aws_vpc.vpc.id
+  cidr_block              = "10.0.0.0/24"
+  map_public_ip_on_launch = false
+  tags = {
+    Name = "${local.project}-subnet-private"
+  }
+}
+
+resource "aws_route_table" "route_table_private" {
+  vpc_id = aws_vpc.vpc.id
+
+  tags = {
+    Name = "${local.project}-route-table-private"
+  }
+}
+
+resource "aws_route_table_association" "route_table_association_private" {
+  subnet_id      = aws_subnet.subnet_private.id
+  route_table_id = aws_route_table.route_table_private.id
+}
+
+resource "aws_default_network_acl" "default_network_acl" {
+  default_network_acl_id = aws_vpc.vpc.default_network_acl_id
+  subnet_ids             = [aws_subnet.subnet_private.id]
+
+  ingress {
+    protocol   = -1
+    rule_no    = 100
+    action     = "allow"
+    cidr_block = "0.0.0.0/0"
+    from_port  = 0
+    to_port    = 0
+  }
+
+  egress {
+    protocol   = -1
+    rule_no    = 100
+    action     = "allow"
+    cidr_block = "0.0.0.0/0"
+    from_port  = 0
+    to_port    = 0
+  }
+
+  tags = {
+    Name = "${local.project}-default-network-acl"
+  }
+}
+
+resource "aws_default_security_group" "default_security_group" {
+  vpc_id = aws_vpc.vpc.id
+
+  ingress {
+    protocol  = -1
+    self      = true
+    from_port = 0
+    to_port   = 0
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  tags = {
+    Name = "${local.project}-default-security-group"
+  }
+}
 
 ## Roles
 resource "aws_iam_role" "LambdaRole" {
@@ -99,6 +202,11 @@ resource "aws_iam_role_policy_attachment" "LambdaRolePolicy" {
   policy_arn = aws_iam_policy.LambdaPolicy.arn
 }
 
+resource "aws_iam_role_policy_attachment" "iam_role_policy_attachment_lambda_vpc_access_execution" {
+  role       = aws_iam_role.LambdaRole.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole"
+}
+
 ## 
 
 data "archive_file" "createScheduledTask" {
@@ -116,7 +224,10 @@ resource "aws_lambda_function" "CreateTaskHandler" {
 
   handler = "createScheduledTask.lambda_handler"
   runtime = "python3.8"
-
+  vpc_config {
+    subnet_ids         = [aws_subnet.subnet_private.id]
+    security_group_ids = [aws_default_security_group.default_security_group.id]
+  }
   environment {
     variables = {
       REGION     = local.region
@@ -148,6 +259,10 @@ resource "aws_lambda_function" "ListTaskHandler" {
 
   handler = "listScheduledTask.lambda_handler"
   runtime = "python3.8"
+  vpc_config {
+    subnet_ids         = [aws_subnet.subnet_private.id]
+    security_group_ids = [aws_default_security_group.default_security_group.id]
+  }
 
   environment {
     variables = {
@@ -180,6 +295,10 @@ resource "aws_lambda_function" "executeScheduledTaskHandler" {
 
   handler = "executeScheduledTask.lambda_handler"
   runtime = "python3.8"
+  vpc_config {
+    subnet_ids         = [aws_subnet.subnet_private.id]
+    security_group_ids = [aws_default_security_group.default_security_group.id]
+  }
 
   environment {
     variables = {
@@ -363,6 +482,131 @@ resource "aws_iam_role_policy_attachment" "terraform_lambda_iam_policy_basic_exe
 resource "aws_s3_bucket" "taskstorage" {
   bucket        = local.bucket_name
   force_destroy = true
+}
+# Define an account specific data source
+data "aws_caller_identity" "current" {}
+# Provision the KMS key
+resource "aws_kms_key" "kms_key" {
+  description             = "KMS key for S3  Bucket"
+  deletion_window_in_days = 7
+
+  policy = jsonencode({
+    Version = "2012-10-17",
+    Id      = "${local.project}-prod-key-policy",
+    Statement = concat([
+      {
+        Sid    = "Allow administration of the key",
+        Effect = "Allow",
+        Principal = {
+          AWS = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:root" # allow the root user to administer the key but not use it
+        },
+        Action = [
+          "kms:Create*",
+          "kms:Describe*",
+          "kms:Enable*",
+          "kms:List*",
+          "kms:Put*",
+          "kms:Update*",
+          "kms:Revoke*",
+          "kms:Disable*",
+          "kms:Get*",
+          "kms:Delete*",
+          "kms:ScheduleKeyDeletion",
+          "kms:CancelKeyDeletion"
+        ],
+        Resource = "*"
+      },
+      {
+        Sid    = "Allow use of the key",
+        Effect = "Allow",
+        Principal = {
+          AWS = "${aws_iam_role.LambdaRole.arn}" # allow the lambda execution role to use the key but not administer it
+        },
+        Action   = ["kms:Decrypt", "kms:DescribeKey", "kms:Encrypt", "kms:GenerateDataKey*", "kms:ReEncrypt*", "kms:CreateGrant"]
+        Resource = "*"
+      }]
+    )
+  })
+}
+
+resource "aws_s3_bucket_server_side_encryption_configuration" "sse_config" {
+  bucket = aws_s3_bucket.taskstorage.id
+
+  rule {
+    apply_server_side_encryption_by_default {
+      kms_master_key_id = aws_kms_key.kms_key.arn
+      sse_algorithm     = "aws:kms"
+    }
+    bucket_key_enabled = true # The bucket key reduces encryption costs by lowering calls to AWS KMS.
+  }
+}
+
+# Endpoint policy for the S3 endpoint
+data "aws_iam_policy_document" "s3_endpoint_policy" {
+  statement {
+    actions   = ["s3:putObject", "s3:getObject"]
+    resources = ["${aws_s3_bucket.taskstorage.arn}/*"]
+
+    principals {
+      type        = "*"
+      identifiers = ["*"]
+    }
+
+    condition {
+      test     = "ArnEquals"
+      variable = "aws:PrincipalArn"
+      values   = [aws_iam_role.LambdaRole.arn] # only allow access to this endpoint from the Lambda function
+    }
+  }
+}
+
+# VPC gateway endpoint for S3. This will make sure our Lambda can access S3 without going over the internet
+resource "aws_vpc_endpoint" "s3_vpce" {
+  vpc_id            = aws_vpc.vpc.id
+  service_name      = "com.amazonaws.${local.region}.s3"
+  vpc_endpoint_type = "Gateway"
+  route_table_ids   = [aws_route_table.route_table_private.id]
+  policy            = data.aws_iam_policy_document.s3_endpoint_policy.json
+}
+
+# Define an S3 bucket policy that only allows access from the VPC S3 Gateway endpoint
+data "aws_iam_policy_document" "bucket_policy" {
+  statement {
+    sid    = "DenyAllUnlessFromSpecificVPCe" # deny everybody not coming in via the VPC endpoint
+    effect = "Deny"
+
+    principals {
+      type        = "AWS"
+      identifiers = ["${aws_iam_role.LambdaRole.arn}"]
+    }
+
+    actions = ["s3:*"]
+
+    resources = [
+      "${aws_s3_bucket.taskstorage.arn}/*", # allow access to all objects in the bucket
+      "${aws_s3_bucket.taskstorage.arn}"
+    ]
+
+    condition {
+      test     = "StringNotEquals"
+      variable = "aws:sourceVpce"
+      values = [
+        aws_vpc_endpoint.s3_vpce.id # only allow access when this VPC S3 Gateway endpoint is used
+      ]
+    }
+  }
+}
+
+# Attach the S3 bucket policy to the S3 bucket
+resource "aws_s3_bucket_policy" "bucket_policy" {
+  bucket = aws_s3_bucket.taskstorage.id
+  policy = data.aws_iam_policy_document.bucket_policy.json
+}
+
+# Add an alias to the KMS key
+resource "aws_kms_alias" "kms_alias" {
+  name          = "alias/${local.project}-kms-key" # add an alias for easier identification in the console
+  target_key_id = aws_kms_key.kms_key.key_id
 }
 
 ##############################################

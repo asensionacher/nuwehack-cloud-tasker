@@ -2,11 +2,11 @@
   "api_invoke_url": {
     "sensitive": false,
     "type": "string",
-    "value": "https://ox4i85wh74.execute-api.us-east-1.amazonaws.com/prod"
+    "value": "https://fqmam0rgve.execute-api.us-east-1.amazonaws.com/prod"
   },
   "api_rest_api_id": {
     "sensitive": false,
     "type": "string",
-    "value": "ox4i85wh74"
+    "value": "fqmam0rgve"
   }
 }
