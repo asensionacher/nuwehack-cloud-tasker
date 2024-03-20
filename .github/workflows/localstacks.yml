@@ -16,9 +16,6 @@ jobs:
         with:
           terraform_wrapper: false
 
-      - name: HashiCorp - Setup Terraform
-        uses: hashicorp/setup-terraform@v2.0.3
-          
       - name: Set up Python 3.10
         id: setup-python
         uses: actions/setup-python@v5
