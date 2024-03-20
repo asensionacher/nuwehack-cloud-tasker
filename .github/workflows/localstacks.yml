@@ -33,30 +33,25 @@ jobs:
           image-tag: 'latest'
           install-awslocal: 'true'
           configuration: DEBUG=1
-      - name: Deploy AWS resources with Terraform
+      - name: Deploy AWS resources with Terraform and execute api calls
         run: |
           cd Infraestructure/Terraform
           terraform init
           terraform plan
           terraform apply --auto-approve
           terraform output --json > out.json
-      - name: Execute createtask
-        run: |
-          api_rest_api_id=$(cat Infraestructure/Terraform/out.json | jq -r '.api_rest_api_id.value')
+          api_rest_api_id=$(cat out.json | jq -r '.api_rest_api_id.value')
           curl -X POST "http://localhost:4566/restapis/${api_rest_api_id}/prod/_user_request_/createtask" -H 'Content-Type: application/json' -d'
           {
             "task_name": "MyAwesomeTask",
             "cron_expression": "* * * * *"
           }'
-      - name: Execute listtask
-        run: |
-          api_rest_api_id=$(cat Infraestructure/Terraform/out.json | jq -r '.api_rest_api_id.value')
           curl -X GET "http://localhost:4566/restapis/${api_rest_api_id}/prod/_user_request_/listtask"
       - name: Wait one minute
         uses: GuillaumeFalourd/wait-sleep-action@v1
         with:
           time: '1m' # for 1 minute
-      - name: Check every-minute
+      - name: Check s3 storage
         run: |
           awslocal s3 ls s3://taskstorage
 
