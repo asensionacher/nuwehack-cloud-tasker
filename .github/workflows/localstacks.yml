@@ -12,7 +12,7 @@ jobs:
         uses: actions/checkout@v3
 
       - name: Setup Terraform
-        uses: hashicorp/setup-terraform@2.0.3
+        uses: hashicorp/setup-terraform@v2.0.3
         with:
           terraform_wrapper: false
 
