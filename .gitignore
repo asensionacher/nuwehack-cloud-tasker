@@ -39,3 +39,4 @@ terraform.rc
 
 # Ignore src
 Infraestructure/Terraform/src/*
+out.json
