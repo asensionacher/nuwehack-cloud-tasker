@@ -13,6 +13,8 @@ jobs:
 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v2.0.3
+        with:
+          terraform_wrapper: false
 
       - name: HashiCorp - Setup Terraform
         uses: hashicorp/setup-terraform@v2.0.3
@@ -40,12 +42,17 @@ jobs:
           terraform plan
           terraform apply --auto-approve
           terraform output --json > out.json
-          api_rest_api_id=$(cat out.json | jq -r '.api_rest_api_id.value')
+      - name: Execute createtask
+        run: |
+          api_rest_api_id=$(cat Infraestructure/Terraform/out.json | jq -r '.api_rest_api_id.value')
           curl -X POST "http://localhost:4566/restapis/${api_rest_api_id}/prod/_user_request_/createtask" -H 'Content-Type: application/json' -d'
           {
             "task_name": "MyAwesomeTask",
             "cron_expression": "* * * * *"
           }'
+      - name: Execute listtask
+        run: |
+          api_rest_api_id=$(cat Infraestructure/Terraform/out.json | jq -r '.api_rest_api_id.value')
           curl -X GET "http://localhost:4566/restapis/${api_rest_api_id}/prod/_user_request_/listtask"
       - name: Wait one minute
         uses: GuillaumeFalourd/wait-sleep-action@v1
