@@ -10,6 +10,10 @@ This repository deploys the Amazon Web Services resources for passing the `nuweh
 
 Where the user can call to the endpoints on the API Gateway for adding a record to the DynamoDB or getting all the records from the DynamoDB that are redirected to the Lambdas and also there is a timer where each minute the EventBridge sends a API Call to the API Gateway which redirects to a Lambda that creates a random file in a S3 bucket.
 
+> [!WARNING]  
+> A WAFv2 was intended to add to this architecture. However, _localstacks_ is not accepting this feature
+> in the community version.
+
 ## How to use
 
 This code is intended to be used with LocalStacks, is not tested with a real AWS environment.
